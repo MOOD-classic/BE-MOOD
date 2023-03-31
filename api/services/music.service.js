@@ -225,19 +225,43 @@ class MusicService {
   };
 
   likeChart = async (userId) => {
-    const likeChart = await this.musicRepository.likeChart();
-    for (let i = 0; i < likeChart.length; i++) {
-      const Like = await this.likeRepository.findLike(
-        userId,
-        likeChart[i].musicId
+    const cacheKey = "likeChart";
+  
+    const cachedResult = await this.musicRepository.getChartData(cacheKey);
+  
+    if (cachedResult) {
+      // 캐시에 데이터가 있으면 반환 전에 likeStatus를 업데이트
+      await Promise.all(
+        cachedResult.map(async (item) => {
+          const Like = await this.likeRepository.findLike(userId, item.musicId);
+          item.likeStatus = !!Like;
+        })
       );
-      if (!Like) {
-        likeChart[i].dataValues.likeStatus = false;
-      } else {
-        likeChart[i].dataValues.likeStatus = true;
-      }
+      return cachedResult;
+    } else {
+      const likeChart = await this.musicRepository.likeChart();
+  
+    await Promise.all(
+      likeChart.map(async (item) => {
+        const Like = await this.likeRepository.findLike(userId, item.musicId);
+        item.dataValues.likeStatus = !!Like;
+      })
+    );
+  
+    const processedLikeChart = cloudfrontfor(likeChart);
+    await this.musicRepository.setCache(processedLikeChart, cacheKey);
+  
+    return processedLikeChart;
     }
-    return cloudfrontfor(likeChart);
+  };
+
+  updateLikeStatus = async (chart, userId) => {
+    await Promise.all(
+      chart.map(async (item) => {
+        const Like = await this.likeRepository.findLike(userId, item.musicId);
+        item.dataValues.likeStatus = !!Like;
+      })
+    );
   };
 
   streamingChart = async () => {

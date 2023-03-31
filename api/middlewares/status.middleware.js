@@ -13,7 +13,6 @@ module.exports = async (req, res, next) => {
       const user = await Users.findOne({ where: { userId } });
 
       res.locals.user = user;
-      next();
     } catch (error) {
       if (error instanceof jwt.TokenExpiredError) {
         res.status(403).send("엑세스 토큰이 만료되었습니다.");
@@ -28,4 +27,5 @@ module.exports = async (req, res, next) => {
   } else {
     res.locals.user = { userId: uuidv4() };
   }
+  next();
 };

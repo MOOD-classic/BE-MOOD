@@ -10,6 +10,7 @@ const { makeError } = require("../error");
 const { S3 } = require("aws-sdk");
 const Sequelize = require("sequelize");
 const { Op } = require("sequelize");
+const redisClient = require("../../db/config/redisClient");
 
 class MusicRepository {
   constructor() {}
@@ -73,7 +74,7 @@ class MusicRepository {
       where: composer,
     });
     let music = await Musics.findAll({
-      where: { composer: composer.composer.split(" ").slice(-1)},
+      where: { composer: composer.composer.split(" ").slice(-1) },
     });
     return { composerInfo, music };
   };
@@ -464,6 +465,27 @@ class MusicRepository {
     const streaming = await Streamings.create({ userId, musicId });
     return streaming;
   };
+
+  getChartData = async (cacheKey) => {
+    try {
+      const data = await redisClient.get(cacheKey);
+      if (!data) {
+        console.log("No data found in Redis.");
+        return null;
+      } else {
+        return JSON.parse(data);
+      }
+    } catch (err) {
+      console.error("Redis get error: ", err);
+      return null;
+    }
+    
+  };
+
+  setCache = async (processedLikeChart, cacheKey) => {
+    await redisClient.set(cacheKey, JSON.stringify(processedLikeChart), "EX", 60 * 60);
+    return
+  }
 }
 
 module.exports = MusicRepository;
